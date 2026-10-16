@@ -1,6 +1,9 @@
 
 import { useEffect, useState } from "react";
-import { ArrowUpRightIcon, CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react";
+import { ArrowUpRightIcon, CaretLeftIcon, CaretRightIcon, ShoppingCartIcon } from "@phosphor-icons/react";
+
+import { useCart } from "../../../../context/CartContext";
+
 
 const API_URL =
   "https://soumi.ahaanmedia.com/wp-json/wc/store/v1/products?per_page=20";
@@ -108,14 +111,50 @@ export default function ProductBelles() {
     return () => controller.abort();
   }, []);
 
+  const { addToCart } = useCart();
+
+  const [addingProductId, setAddingProductId] = useState(null);
+  const [cartMessage, setCartMessage] = useState("");
+  const [cartError, setCartError] = useState("");
+
+  //cart functionality
+  async function handleAddToCart(product) {
+    if (
+      product.type !== "simple" ||
+      product.is_purchasable === false ||
+      product.is_in_stock === false
+    ) {
+      setCartError("Please visit the product page to select options or check availability.");
+      setCartMessage("");
+      return;
+    }
+
+    try {
+      setAddingProductId(product.id);
+      setCartMessage("");
+      setCartError("");
+
+      await addToCart(product.id, 1);
+
+      setCartMessage(`${product.name} added to your cart.`);
+    } catch (err) {
+      console.error("Add to cart error:", err);
+      setCartError(
+        err.message || "Unable to add this product. Please try again."
+      );
+    } finally {
+      setAddingProductId(null);
+    }
+  }
+
   // Infinite-loop slider:
   // Add copies of the first products after the real products.
   const canSlide = products.length > visibleCount;
   const loopProducts = canSlide
     ? [
-        ...products,
-        ...products.slice(0, visibleCount),
-      ]
+      ...products,
+      ...products.slice(0, visibleCount),
+    ]
     : products;
 
   function nextSlide() {
@@ -233,9 +272,8 @@ export default function ProductBelles() {
                       key={`${product.id}-${index}`}
                       className="min-w-0 shrink-0"
                       style={{
-                        width: `calc((100% - ${
-                          GAP * (visibleCount - 1)
-                        }px) / ${visibleCount})`,
+                        width: `calc((100% - ${GAP * (visibleCount - 1)
+                          }px) / ${visibleCount})`,
                         marginRight: GAP,
                       }}
                     >
@@ -258,7 +296,7 @@ export default function ProductBelles() {
                       {/* Product information */}
                       <div className="pt-6 px-4 xl:px-8  items-center">
                         <p
-                          
+
                           title={product.name}
                           className="block truncate font-heading text-lg xl:text-[26px] text-black"
                         >
@@ -273,11 +311,10 @@ export default function ProductBelles() {
                           {[1, 2, 3, 4].map((star) => (
                             <span
                               key={star}
-                              className={`text-sm xl:text-2xl ${
-                                star <= Math.round(rating)
-                                  ? "text-gray-300"
-                                  : "text-black"
-                              }`}
+                              className={`text-sm xl:text-2xl ${star <= Math.round(rating)
+                                ? "text-gray-300"
+                                : "text-black"
+                                }`}
                             >
                               ★
                             </span>
@@ -289,21 +326,50 @@ export default function ProductBelles() {
                           {formatPrice(product)}
                         </p>
 
-                        {/* Quick view */}
+                        <div className="mt-6 flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(product)}
+                            disabled={
+                              addingProductId === product.id ||
+                              product.type !== "simple" ||
+                              product.is_purchasable === false ||
+                              product.is_in_stock === false
+                            }
+                            className="rounded-full bg-[#77895D] p-4 items-center text-xs font-medium uppercase text-white transition hover:bg-[#5E432D] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {addingProductId === product.id
+                              ? "Adding..."
+                              : product.type !== "simple"
+                                ? "Choose Options"
+                                : product.is_in_stock === false
+                                  ? "Out of Stock"
+                                  : <ShoppingCartIcon size={20}/>}
+                          </button>
+
+                         
+                          {/* Quick view */}
                         <button
                           type="button"
-                          onClick={() => setSelectedProduct(product)}
-                          className="group mt-6 inline-flex  cursor-pointer  max-w-fit items-center gap-3 rounded-full bg-[#77895D] py-2 xl:py-2.5 pl-4 pr-2.5 font-inter text-xs font-medium uppercase text-white  sm:gap-4 sm:pl-5 xl:text-sm transition-all duration-300 hover:-translate-y-[2px] hover:bg-[#5E432D] hover:shadow-[0_10px_24px_rgba(0,0,0,0.25)]"
+                          onClick={() => {
+                              setSelectedProduct(product);
+                              setCartMessage("");
+                              setCartError("");
+                            }}
+                          className="group  inline-flex  cursor-pointer  max-w-fit items-center gap-3 rounded-full bg-[#77895D] py-2 xl:py-2.5 pl-4 pr-2.5 font-inter text-xs font-medium uppercase text-white  sm:gap-4 sm:pl-5 xl:text-sm transition-all duration-300 hover:-translate-y-[2px] hover:bg-[#5E432D] hover:shadow-[0_10px_24px_rgba(0,0,0,0.25)]"
                         >
                           Quick View
                           <span className="flex w-6 h-6 xl:h-8 xl:w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#77895D]">
-                                        <ArrowUpRightIcon
-                                          size={16}
-                                          weight="bold"
-                                            className="transition-transform duration-300 group-hover:rotate-180"
-                                        />
-                                      </span>
+                            <ArrowUpRightIcon
+                              size={16}
+                              weight="bold"
+                              className="transition-transform duration-300 group-hover:rotate-180"
+                            />
+                          </span>
                         </button>
+                        </div>
+
+
                       </div>
                     </article>
                   );
@@ -369,6 +435,42 @@ export default function ProductBelles() {
               <p className="text-sm leading-6 text-gray-600">
                 {getDescription(selectedProduct)}
               </p>
+
+              {selectedProduct.type === "simple" &&
+                selectedProduct.is_purchasable !== false &&
+                selectedProduct.is_in_stock !== false ? (
+                <button
+                  type="button"
+                  onClick={() => handleAddToCart(selectedProduct)}
+                  disabled={addingProductId === selectedProduct.id}
+                  className="w-fit rounded-full bg-[#77895D] p-4 text-xs font-medium uppercase text-white transition hover:bg-[#5E432D] disabled:opacity-50"
+                >
+                  {addingProductId === selectedProduct.id
+                    ? "Adding to Cart..."
+                    : <ShoppingCartIcon size={20}/>}
+                </button>
+              ) : (
+                <a
+                  href={selectedProduct.permalink}
+                  className="w-fit rounded-full bg-[#77895D] px-6 py-3 text-xs font-medium uppercase text-white transition hover:bg-[#5E432D]"
+                >
+                  {selectedProduct.type === "variable"
+                    ? "Choose Options"
+                    : "View Product"}
+                </a>
+              )}
+
+              {cartMessage && (
+                <p role="status" className="text-sm text-green-700">
+                  {cartMessage}
+                </p>
+              )}
+
+              {cartError && (
+                <p role="alert" className="text-sm text-red-600">
+                  {cartError}
+                </p>
+              )}
 
               <a
                 href={selectedProduct.permalink}
